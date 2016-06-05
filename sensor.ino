@@ -29,9 +29,13 @@ void setup() {
   Serial1.println("AT+RST");
   //connexion au wifi
   Serial1.println("AT+CWJAP=\"Bbox-B4328E\",\"4D8A272250\"");
-  delay(1000);
-  // Connexion au server
-  Serial1.println("AT+CIPSTART=\"TCP\",\"192.168.1.54\",80");
+  delay(5000);
+  if(Serial1.find("OK")){
+    // Start de la connexion
+    delay(5000);
+    Serial1.println("AT+CIPSTART=\"TCP\",\"192.168.1.54\",80");
+  }
+  
 
   // initialize les pin en tant que sortie.
   pinMode(2, OUTPUT);
@@ -51,7 +55,7 @@ void loop() {
     //checkStateAfterLimit();
   //}
   
-  if(state != lastState){
+  if(state != lastState && state > 0){
     text = String("Etat:");
     sendAlert(text, state);
   }
@@ -165,8 +169,7 @@ void WebRequest(String request){
   Serial.println("path: |" + path + "|");     
      
   //Commande start
-  String startcommand = "AT+CIPSTART=\"TCP\",\"" + domain + "\", 80";
-     
+  //String startcommand = "AT+CIPSTART=\"TCP\",\"" + domain + "\", 80"; 
   //Serial1.println(startcommand);
   //delay(3000);
   //Serial.println(startcommand);
