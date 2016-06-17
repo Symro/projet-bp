@@ -1,4 +1,4 @@
-  //serial buffer for request url
+//serial buffer for request url
 char serialbuffer[1000];
 
 // Importation de la Time library
@@ -66,9 +66,6 @@ void loop() {
     text = String("Etat:");
     sendAlert(text, state);
   }
-  
-  // On écrase lastState avant de réexecuter la loop
-  lastState = state;
 
   // Délai d'attente avant le prohain check en ms
   delay(2000);
@@ -95,6 +92,9 @@ void loop() {
       WebRequest(message);
     }
   }
+
+  // On écrase lastState avant de réexecuter la loop
+  lastState = state;
 }
 
 // set State en fonction de la valeur du capteur
@@ -118,6 +118,7 @@ void checkSensorValue() {
     if (captorValues[i] >= 10) {
       state++;
     }
+    Serial.println(captorValues[i]);
   }
 
   if (state == 1){
@@ -129,7 +130,7 @@ void checkSensorValue() {
   if (state == 3){
     digitalWrite(4, HIGH);
   }
-  //Serial.println(state);
+  Serial.println(state);
 }
 
 // Vérification de l'état si il a changé ou non au bout d'un temps défini afin de prévenir le personnel
