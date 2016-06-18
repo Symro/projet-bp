@@ -1,103 +1,86 @@
-//serial buffer for request url
-char serialbuffer[1000];
+char serialbuffer[1000];//serial buffer for request url
 
-// Importation de la Time library
-//#include <elapsedMillis.h>
-
-// Déclare global variables
-String text;
+//globales values
 int currentSensorValue5, currentSensorValue4, currentSensorValue3;
 int captorValues[3];
 // Etat du change 0:sec -- > 3:saturation
 int state = 0, lastState = 0;
-// variable du temps passé en ms
-//elapsedMillis elapsedTime;
-// Délai entre les vérifications en ms
-// 1h 3600000
-// 5h 18000000
-unsigned int interval = 500;
-bool elapsedTimeAlert = false;
-//WiFi Setup
-String ssid = "Bbox-B4328E";
-//String ssid = "Sylvain";
-//String ssid = "GateHetic2-RDC";
-//String password = "!!hetic2016!!";
-//String password = "paproto93";
-String password = "4D8A272250";
-//String ip = "178.62.76.82";
-String ip = "192.168.1.54";
-//user infos
-String username = "durand";
-int type = 1;
+//globales serveur
+//String ip = "192.168.1.54";
+String ip = "178.62.76.82";
 
 void setup() {
-  //connection à ESP8266
-  Serial1.begin(9600);
-  // initialition de la communication 9600 bits par seconde
-  Serial.begin(9600);
-
-  // Reset de l'ESP
-  Serial1.println("AT+RST");
-  //AT+CIOBAUD=9600
-  delay(5000);
-  
-  //connexion au wifi
-  Serial.println("AT+CWJAP=\"" + ssid + "\",\"" + password + "\"");
-  Serial1.println("AT+CWJAP=\"" + ssid + "\",\"" + password + "\"");
-  //delay(5000); 
+  //connection à l'ESP8266
+  Serial1.begin(115200);
+  //debug avec la console
+  Serial.begin(115200);
 
   // initialize les pin en tant que sortie.
   pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
   pinMode(4, OUTPUT);
+  pinMode(6, OUTPUT);
+  pinMode(8, INPUT);
+
+  //set mode needed for new boards
+  Serial1.println("AT+RST");
+  //delay(1000);
+  //Serial1.println("AT+CWMODE=1");
+  //delay(1000);//delay after mode change
+  //Serial1.println("AT+RST");
+  
+  //connect to wifi network
+  Serial1.println("AT+CWJAP=\"Sylvain\",\"paproto93\"");
+  delay(1000);
 }
 
 void loop() {
-  // lecture la pin analogique ou est relié le module comparateur
-  currentSensorValue5 = analogRead(A5);
-  currentSensorValue4 = analogRead(A4);
-  currentSensorValue3 = analogRead(A3);
-  checkSensorValue();
-
-  // Vérification si il y a eu changement du state après 5h
-  //if (elapsedTime > interval) {
-    //checkStateAfterLimit();
-  //}
-  
-  if(state != lastState && state > 0){
-    text = String("Etat:");
-    sendAlert(text, state);
-  }
-
-  // Délai d'attente avant le prohain check en ms
-  delay(2000);
-  //affiche dans la console tout ce que l'ESP remonte comme info
+  Serial.println(state);
+  //output everything from ESP8266 to the Arduino Micro Serial output
   while (Serial1.available() > 0) {
     Serial.write(Serial1.read());
   }
   
   if (Serial.available() > 0) {
-   //read from serial until terminating character
-   int len = Serial.readBytesUntil('\n', serialbuffer, sizeof(serialbuffer));
+    //read from serial until terminating character
+    int len = Serial.readBytesUntil('\n', serialbuffer, sizeof(serialbuffer));
   
-   //trim buffer to length of the actual message
-   String message = String(serialbuffer).substring(0,len-1);
-   Serial.println("message: " + message);
+    //trim buffer to length of the actual message
+    String message = String(serialbuffer).substring(0,len-1);
+    Serial.println("message: " + message);
  
-   //check to see if the incoming serial message is a url or an AT command
-   if(message.substring(0,2)=="AT"){
-     //make command request
-     Serial.println("COMMAND REQUEST");
-     Serial1.println(message); 
-   }else{
-     //make webrequest
-     Serial.println("WEB REQUEST");
-     WebRequest(message);
-   }
+    //Verification si une commande est envoyé ou une url dans la console
+    if(message.substring(0,2)=="AT"){
+      //make command request
+      Serial.println("COMMAND REQUEST");
+      Serial1.println(message); 
+    }else{
+      
+     // On débute la liaison
+     String startcommand = "AT+CIPSTART=\"TCP\",\"" + ip + "\",6060";
+     Serial.println(startcommand);
+     Serial1.println(startcommand);
+     delay(3000);  
+     // requete web
+      Serial.println("WEB REQUEST");
+      WebRequest(message);
+    }
   }
 
+  // lecture des connexions au capteur
+  currentSensorValue5 = analogRead(A5);
+  currentSensorValue4 = analogRead(A4);
+  currentSensorValue3 = analogRead(A3);
+  checkSensorValue();
+
+  // Si l'état n'est plus le même que le précédent on envoie une notification
+  if(state != lastState && state > 0){
+    sendAlert();
+  }
+  
   // On écrase lastState avant de réexecuter la loop
   lastState = state;
+
+  delay(1000);
 }
 
 // set State en fonction de la valeur du capteur
@@ -121,47 +104,39 @@ void checkSensorValue() {
     if (captorValues[i] >= 10) {
       state++;
     }
-    //Serial.println(captorValues[i]);
   }
 
+  //Serial.println(state);
   if (state == 1){
     digitalWrite(2, HIGH);
   }
   if (state == 2){
-    digitalWrite(3, HIGH);
-  }
-  if (state == 3){
     digitalWrite(4, HIGH);
   }
-  //Serial.println(state);
-}
-
-// Vérification de l'état si il a changé ou non au bout d'un temps défini afin de prévenir le personnel
-void checkStateAfterLimit() {
-  if (state == lastState && state == 0 && !elapsedTimeAlert) {
-    text = String("Letat est inchange depuis 5heures pour cette personne: ");
-    text = text + state;
-    sendAlert(text, state);
-    elapsedTimeAlert = true;
+  if (state == 3){
+    digitalWrite(6, HIGH);
   }
 }
 
-// Affichage sur terminal
-void sendAlert(String text, int state) {
-  text = text + state;
-  //Serial.println(text);
-  //Serial.println(ip + "/alert?resident=" + username + "&type=" + type + "&zone=" + state);
-  //WebRequest(ip + "/alert?resident=" + username + "&type=" + type + "&zone=" + state);
-  Serial.println(ip + "/arduino?resident=" + username);
-  WebRequest(ip + "/arduino?resident=" + username);
+// Préparation de l'envoi des notifications0
+void sendAlert() {
+  // On débute la liaison
+  String startcommand = "AT+CIPSTART=\"TCP\",\"" + ip + "\",6060";
+  Serial.println(startcommand);
+  Serial1.println(startcommand);
+  delay(3000);  
+  // requete web
+  Serial.println("WEB REQUEST");
+  WebRequest("178.62.76.82:6060/alert?resident=duhamel&type=1&zone=1");
 }
 
-// envoi d'une requette http
+//web request needs to be sent without the http for now, https still needs some working
 void WebRequest(String request){
- //split de l'url
+  delay(1000);
+  //find the dividing marker between domain and path
   int slash = request.indexOf('/');
      
-  //recup du domaine
+  //grab the domain
   String domain;
   if(slash>0){  
     domain = request.substring(0,slash);
@@ -169,7 +144,7 @@ void WebRequest(String request){
     domain = request;
   }
 
-  //récup du path
+  //get the path
   String path;
   if(slash>0){  
     path = request.substring(slash);   
@@ -177,40 +152,29 @@ void WebRequest(String request){
     path = "/";          
   }
      
-  //log du domaine et du path
+  //output domain and path to verify
   Serial.println("domain: |" + domain + "|");
-  Serial.println("path: |" + path + "|");     
+  Serial.println("path: |" + path + "|");        
      
-  //Commande start
-  //String startcommand = "AT+CIPSTART=\"TCP\",\"" + domain + "\", 80"; 
-  //Serial1.println(startcommand);
-  //delay(3000);
-  //Serial.println(startcommand);
-  //String startcommand = "AT+CIPSTART=\"TCP\",\"" + ip + "\",\"6060";
-  String startcommand = "AT+CIPSTART=\"TCP\",\"" + ip + "\",\"80";
-  Serial1.println(startcommand);
-  delay(300);
-     
-     
-  //test si il y a une erreur au start
+  //test for a start error
   if(Serial1.find("Error")){
     Serial.println("error on start");
     return;
   }
-   
-  //Requête http
-  String sendcommand = "POST http://"+ domain + path + " HTTP/1.0\r\n\r\n\r\n";
-   
+     
+  //create the request command
+  String sendcommand = "POST http://"+ domain + path + " HTTP/1.0\r\n\r\n\r\n";//works for most cases
+     
   Serial.print(sendcommand);
-   
-  //envoi 
+     
+  //send 
   Serial1.print("AT+CIPSEND=");
   Serial1.println(sendcommand.length());
-   
-  //debug
+     
+  //debug the command
   Serial.print("AT+CIPSEND=");
   Serial.println(sendcommand.length());
-  
+   
   //delay(5000);
   if(Serial1.find(">")){
     Serial.println(">");
@@ -220,6 +184,7 @@ void WebRequest(String request){
     delay(1000);
     return;
   }
+
   delay(1000);
   //Serial.print(getcommand);
   Serial1.print(sendcommand); 
