@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 SoftwareSerial ESP8266(10, 11);
 
-String ssid = "GateHetic2-1ER"; // Garder les guillements
-String password = "!!hetic2016!!"; // Garder les guillements
+String ssid = "!!"; // Garder les guillements
+String password = "!!"; // Garder les guillements
 bool espInit = false;
 
 void setup() {
